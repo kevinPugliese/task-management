@@ -1,0 +1,1713 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hábitos — Habit Tracker</title>
+  <style>
+    /* ─── Tokens ───────────────────────────────────────────────── */
+    :root {
+      --bg:          #0c0e1a;
+      --surface:     #13162b;
+      --surface2:    #1c2040;
+      --surface3:    #242848;
+      --border:      #2a2f52;
+      --border2:     #353a60;
+
+      /* habit = violet */
+      --h-color:     #7c6fff;
+      --h-dim:       rgba(124,111,255,.12);
+      --h-border:    rgba(124,111,255,.3);
+
+      /* one-time = amber */
+      --o-color:     #f59e0b;
+      --o-dim:       rgba(245,158,11,.10);
+      --o-border:    rgba(245,158,11,.28);
+
+      --morning:     #f59e0b;
+      --afternoon:   #34d399;
+      --night:       #818cf8;
+      --danger:      #f43f5e;
+      --success:     #10b981;
+
+      --text:        #e2e8f0;
+      --text2:       #94a3b8;
+      --text3:       #475569;
+
+      --radius-sm:   8px;
+      --radius:      12px;
+      --radius-lg:   16px;
+      --shadow:      0 8px 32px rgba(0,0,0,.5);
+      --t:           .18s ease;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── Header ───────────────────────────────────────────────── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 18px 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 14px;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 11px;
+    }
+
+    .logo-mark {
+      width: 38px; height: 38px;
+      background: linear-gradient(135deg, var(--h-color), #a78bfa);
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+
+    .logo-text h1 {
+      font-size: 1.15rem;
+      font-weight: 750;
+      letter-spacing: -.3px;
+    }
+
+    .logo-text span {
+      font-size: .72rem;
+      color: var(--text2);
+      display: block;
+      margin-top: 1px;
+    }
+
+    .header-pills {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .pill {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 6px 16px;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .pill-icon { font-size: .9rem; }
+
+    .pill-val {
+      font-size: 1rem;
+      font-weight: 800;
+    }
+
+    .pill-lbl {
+      font-size: .7rem;
+      color: var(--text2);
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    /* ─── Tab Nav ──────────────────────────────────────────────── */
+    .tab-bar {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      gap: 0;
+      padding: 0 28px;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+
+    .tab-bar::-webkit-scrollbar { display: none; }
+
+    .tab-btn {
+      border: none;
+      background: transparent;
+      color: var(--text2);
+      font-size: .85rem;
+      font-weight: 600;
+      padding: 14px 20px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color var(--t), border-color var(--t);
+      white-space: nowrap;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .tab-btn:hover { color: var(--text); }
+
+    .tab-btn.active {
+      color: var(--h-color);
+      border-bottom-color: var(--h-color);
+    }
+
+    .tab-badge {
+      background: var(--h-dim);
+      color: var(--h-color);
+      font-size: .65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      border: 1px solid var(--h-border);
+    }
+
+    /* ─── Views ────────────────────────────────────────────────── */
+    .view { display: none; padding: 28px; max-width: 1100px; margin: 0 auto; width: 100%; }
+    .view.active { display: block; }
+
+    /* ─── Grid ─────────────────────────────────────────────────── */
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 720px) {
+      .two-col { grid-template-columns: 1fr; }
+      .view { padding: 16px; }
+      .tab-btn { padding: 12px 14px; font-size: .8rem; }
+      .header { padding: 14px 16px; }
+    }
+
+    /* ─── Cards ────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 22px;
+    }
+
+    .card-habit    { border-top: 3px solid var(--h-color); }
+    .card-onetime  { border-top: 3px solid var(--o-color); }
+
+    .card-head {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin-bottom: 18px;
+    }
+
+    .card-icon {
+      width: 30px;
+      height: 30px;
+      border-radius: var(--radius-sm);
+      display: grid;
+      place-items: center;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+
+    .icon-habit   { background: var(--h-dim); }
+    .icon-onetime { background: var(--o-dim); }
+
+    .card-head h2 { font-size: .95rem; font-weight: 700; }
+    .card-head p  { font-size: .73rem; color: var(--text2); margin-top: 2px; }
+
+    /* ─── Form ─────────────────────────────────────────────────── */
+    .field-group { display: flex; flex-direction: column; gap: 5px; }
+    .field-group label { font-size: .72rem; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; }
+
+    input[type="text"],
+    input[type="number"] {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-size: .875rem;
+      padding: 9px 13px;
+      width: 100%;
+      outline: none;
+      transition: border-color var(--t);
+    }
+
+    input:focus { border-color: var(--h-color); }
+    input::placeholder { color: var(--text3); }
+
+    .form-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+
+    .form-row .field-group { flex: 1; }
+    .form-row .field-group.narrow { flex: 0 0 90px; }
+
+    hr.sep { border: none; border-top: 1px solid var(--border); margin: 18px 0; }
+
+    /* ─── Buttons ──────────────────────────────────────────────── */
+    .btn {
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      font-size: .82rem;
+      font-weight: 700;
+      padding: 9px 18px;
+      transition: all var(--t);
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+
+    .btn-habit {
+      background: linear-gradient(135deg, #5f52e8, #8b5cf6);
+      color: #fff;
+      box-shadow: 0 2px 14px rgba(95,82,232,.35);
+    }
+
+    .btn-habit:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(95,82,232,.5); }
+
+    .btn-onetime {
+      background: linear-gradient(135deg, #d97706, #f59e0b);
+      color: #fff;
+      box-shadow: 0 2px 14px rgba(245,158,11,.3);
+    }
+
+    .btn-onetime:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(245,158,11,.45); }
+
+    .btn-ghost {
+      background: transparent;
+      color: var(--text2);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover { border-color: var(--danger); color: var(--danger); }
+
+    .btn-complete-habit {
+      background: var(--h-dim);
+      color: var(--h-color);
+      border: 1px solid var(--h-border);
+    }
+
+    .btn-complete-habit:hover { background: var(--h-color); color: #fff; }
+
+    .btn-complete-onetime {
+      background: var(--o-dim);
+      color: var(--o-color);
+      border: 1px solid var(--o-border);
+    }
+
+    .btn-complete-onetime:hover { background: var(--o-color); color: #fff; }
+
+    .btn-done {
+      background: rgba(16,185,129,.1);
+      color: var(--success);
+      border: 1px solid rgba(16,185,129,.25);
+      cursor: default;
+    }
+
+    /* ─── Task Items ───────────────────────────────────────────── */
+    .task-list { display: flex; flex-direction: column; gap: 8px; }
+
+    .task-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 11px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      animation: slideIn .2s ease;
+      transition: border-color var(--t);
+    }
+
+    .task-item:hover { border-color: var(--border2); }
+
+    .task-item.habit-item   { border-left: 3px solid var(--h-color); }
+    .task-item.onetime-item { border-left: 3px solid var(--o-color); }
+    .task-item.completed-permanently {
+      opacity: .55;
+      border-left-color: var(--success);
+    }
+
+    .task-item-body { flex: 1; min-width: 0; }
+
+    .task-item-name {
+      font-size: .88rem;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .task-item-meta {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 3px;
+    }
+
+    .task-item-score { font-size: .72rem; color: var(--text2); }
+
+    .type-chip {
+      font-size: .65rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 999px;
+      text-transform: uppercase;
+      letter-spacing: .4px;
+    }
+
+    .chip-habit   { background: var(--h-dim); color: var(--h-color); border: 1px solid var(--h-border); }
+    .chip-onetime { background: var(--o-dim); color: var(--o-color); border: 1px solid var(--o-border); }
+    .chip-done    { background: rgba(16,185,129,.1); color: var(--success); border: 1px solid rgba(16,185,129,.25); }
+
+    .task-actions { display: flex; gap: 6px; flex-shrink: 0; align-items: center; }
+
+    /* ─── Time-of-day badges ───────────────────────────────────── */
+    .tod-badge {
+      font-size: .7rem;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 999px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .tod-morning   { background: rgba(245,158,11,.12); color: var(--morning);   border: 1px solid rgba(245,158,11,.25); }
+    .tod-afternoon { background: rgba(52,211,153,.12); color: var(--afternoon); border: 1px solid rgba(52,211,153,.25); }
+    .tod-night     { background: rgba(129,140,248,.12); color: var(--night);    border: 1px solid rgba(129,140,248,.25); }
+    .tod-early     { background: rgba(148,163,184,.1); color: var(--text2);     border: 1px solid var(--border); }
+
+    /* ─── Today ────────────────────────────────────────────────── */
+    .score-hero {
+      background: linear-gradient(135deg, var(--surface2), var(--surface3));
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 24px 28px;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .score-hero-left { }
+    .score-hero-label { font-size: .75rem; color: var(--text2); text-transform: uppercase; letter-spacing: .5px; }
+
+    .score-hero-val {
+      font-size: 3rem;
+      font-weight: 900;
+      line-height: 1;
+      margin: 4px 0;
+      background: linear-gradient(135deg, var(--h-color), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .score-hero-date { font-size: .8rem; color: var(--text2); }
+
+    .score-breakdown {
+      display: flex;
+      gap: 20px;
+    }
+
+    .score-part { text-align: center; }
+    .score-part-val { font-size: 1.3rem; font-weight: 800; }
+    .score-part-lbl { font-size: .68rem; color: var(--text2); text-transform: uppercase; letter-spacing: .3px; }
+    .part-habit   .score-part-val { color: var(--h-color); }
+    .part-onetime .score-part-val { color: var(--o-color); }
+
+    .today-section-label {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: .78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .5px;
+      color: var(--text2);
+      margin-bottom: 10px;
+    }
+
+    .section-dot {
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ─── Completion items ─────────────────────────────────────── */
+    .compl-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 14px;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      margin-bottom: 8px;
+      animation: slideIn .2s ease;
+    }
+
+    .compl-item:last-child { margin-bottom: 0; }
+
+    .compl-name { font-size: .875rem; font-weight: 600; }
+    .compl-sub  { font-size: .72rem; color: var(--text2); margin-top: 2px; display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+
+    .pts-chip {
+      font-size: .82rem;
+      font-weight: 800;
+      padding: 4px 12px;
+      border-radius: 999px;
+      white-space: nowrap;
+    }
+
+    .pts-habit   { background: var(--h-dim); color: var(--h-color); border: 1px solid var(--h-border); }
+    .pts-onetime { background: var(--o-dim); color: var(--o-color); border: 1px solid var(--o-border); }
+
+    /* ─── History ──────────────────────────────────────────────── */
+    .hist-day {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      overflow: hidden;
+      margin-bottom: 14px;
+    }
+
+    .hist-day-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 18px;
+      cursor: pointer;
+      user-select: none;
+      transition: background var(--t);
+    }
+
+    .hist-day-head:hover { background: var(--surface2); }
+
+    .hist-day-date { font-weight: 700; font-size: .9rem; }
+    .hist-day-meta { font-size: .73rem; color: var(--text2); margin-top: 2px; }
+
+    .hist-day-right { display: flex; align-items: center; gap: 12px; }
+
+    .hist-day-total {
+      font-size: 1.15rem;
+      font-weight: 900;
+      background: linear-gradient(135deg, var(--h-color), #a78bfa);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hist-chevron { color: var(--text2); font-size: .75rem; transition: transform var(--t); }
+    .hist-chevron.open { transform: rotate(180deg); }
+
+    .hist-entries {
+      display: none;
+      padding: 0 18px 14px;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .hist-entries.open { display: flex; }
+
+    .hist-entry {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--surface2);
+      border-radius: var(--radius-sm);
+      font-size: .82rem;
+    }
+
+    .hist-entry-left { display: flex; align-items: center; gap: 8px; }
+
+    /* ─── Streak ───────────────────────────────────────────────── */
+    .streak-card {
+      background: linear-gradient(135deg, rgba(245,158,11,.08), rgba(239,68,68,.05));
+      border: 1px solid rgba(245,158,11,.2);
+      border-radius: var(--radius-lg);
+      padding: 16px 20px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+
+    .streak-flame { font-size: 2rem; }
+    .streak-num { font-size: 2rem; font-weight: 900; color: var(--morning); line-height: 1; }
+    .streak-txt { font-size: .78rem; color: var(--text2); }
+    .streak-hint { font-size: .68rem; color: var(--text3); margin-top: 2px; }
+
+    /* ─── Empty ────────────────────────────────────────────────── */
+    .empty {
+      text-align: center;
+      padding: 24px 12px;
+      color: var(--text3);
+      font-size: .82rem;
+    }
+
+    .empty-icon { font-size: 1.8rem; margin-bottom: 6px; }
+
+    /* ─── Toast ────────────────────────────────────────────────── */
+    #toast {
+      position: fixed;
+      bottom: 28px;
+      left: 50%;
+      transform: translateX(-50%) translateY(14px);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      color: var(--text);
+      padding: 11px 22px;
+      border-radius: 999px;
+      font-size: .84rem;
+      font-weight: 600;
+      box-shadow: var(--shadow);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity .25s ease, transform .25s ease;
+      z-index: 9999;
+      white-space: nowrap;
+    }
+
+    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ─── Misc ─────────────────────────────────────────────────── */
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .live-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      display: inline-block;
+      animation: blink 2s infinite;
+    }
+
+    @keyframes blink {
+      0%,100% { opacity: 1; }
+      50%      { opacity: .3; }
+    }
+
+    .high-score { border-left: 3px solid var(--morning) !important; }
+
+    .view-title {
+      font-size: 1.1rem;
+      font-weight: 800;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .now-multiplier {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 5px 12px;
+      font-size: .72rem;
+      color: var(--text2);
+    }
+
+    .now-multiplier strong { color: var(--text); }
+
+    /* ─── File I/O controls ────────────────────────────────────── */
+    .file-io-group {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .btn-import {
+      background: var(--surface2);
+      color: var(--text);
+      border: 1px solid var(--border2);
+    }
+
+    .btn-import:hover {
+      border-color: var(--h-color);
+      color: var(--h-color);
+    }
+
+    .btn-save {
+      background: linear-gradient(135deg, #059669, #10b981);
+      color: #fff;
+      box-shadow: 0 2px 12px rgba(16,185,129,.3);
+    }
+
+    .btn-save:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 4px 18px rgba(16,185,129,.45);
+    }
+
+    .btn-save:disabled {
+      opacity: .45;
+      cursor: default;
+      transform: none;
+      box-shadow: none;
+    }
+
+    /* Unsaved-changes banner */
+    .unsaved-banner {
+      background: rgba(245,158,11,.08);
+      border-bottom: 1px solid rgba(245,158,11,.2);
+      color: var(--morning);
+      font-size: .75rem;
+      font-weight: 600;
+      padding: 8px 28px;
+      display: none;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .unsaved-banner.visible { display: flex; }
+  </style>
+</head>
+<body>
+
+<!-- ─── Header ──────────────────────────────────────────────────── -->
+<header class="header">
+  <div class="logo">
+    <div class="logo-mark">🌱</div>
+    <div class="logo-text">
+      <h1>Hábitos</h1>
+      <span id="headerTime">—</span>
+    </div>
+  </div>
+  <div class="header-pills">
+    <div class="pill">
+      <span class="pill-icon">⚡</span>
+      <span class="pill-val" id="hdrTodayPts">0</span>
+      <span class="pill-lbl">pts today</span>
+    </div>
+    <div class="pill">
+      <span class="pill-icon">🔥</span>
+      <span class="pill-val" id="hdrStreak">0</span>
+      <span class="pill-lbl">day streak</span>
+    </div>
+    <div class="pill">
+      <span class="pill-icon">📋</span>
+      <span class="pill-val" id="hdrHabits">0</span>
+      <span class="pill-lbl">habits</span>
+    </div>
+    <div class="pill">
+      <span class="pill-icon">⭐</span>
+      <span class="pill-val" id="hdrOnetime">0</span>
+      <span class="pill-lbl">one-time</span>
+    </div>
+  </div>
+  <div class="file-io-group">
+    <button class="btn btn-import" onclick="handleImport()">📂 Import Data</button>
+    <button class="btn btn-save"   onclick="handleSave()">💾 Save Data</button>
+  </div>
+</header>
+
+<!-- Unsaved-changes banner (shown when in-memory data differs from last save/import) -->
+<div class="unsaved-banner" id="unsavedBanner">
+  ⚠️ You have unsaved changes — click <strong>Save Data</strong> to download your data before closing.
+</div>
+
+<!-- Hidden file input for import -->
+<input type="file" id="fileInput" accept=".txt" style="display:none" />
+
+<!-- ─── Tab Bar ──────────────────────────────────────────────────── -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="tasks" onclick="switchTab('tasks', this)">
+    📋 Tasks <span class="tab-badge" id="tabBadgeTasks">0</span>
+  </button>
+  <button class="tab-btn" data-tab="today" onclick="switchTab('today', this)">
+    🎯 Today
+  </button>
+  <button class="tab-btn" data-tab="history" onclick="switchTab('history', this)">
+    📅 History
+  </button>
+</nav>
+
+<!-- ═══ VIEW: Tasks ══════════════════════════════════════════════ -->
+<div class="view active" id="view-tasks">
+
+  <!-- Current multiplier indicator -->
+  <div style="margin-bottom:20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+    <span class="now-multiplier">
+      <span class="live-dot"></span>
+      Right now: <strong id="nowPeriodLabel">—</strong> &nbsp;·&nbsp; Multiplier: <strong id="nowMultiplier">—</strong>
+    </span>
+    <span style="font-size:.75rem;color:var(--text3)">Habits completed now will earn this multiplier</span>
+  </div>
+
+  <div class="two-col">
+
+    <!-- ── Habits column ─────────────────────────── -->
+    <div>
+      <div class="card card-habit">
+        <div class="card-head">
+          <div class="card-icon icon-habit">🔁</div>
+          <div>
+            <h2 style="color:var(--h-color)">Add Habit</h2>
+            <p>Recurring daily — score depends on completion time</p>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="field-group">
+            <label for="habitName">Habit name</label>
+            <input id="habitName" type="text" placeholder="e.g. Morning run, Read 20 pages…" maxlength="60" />
+          </div>
+          <div class="field-group narrow">
+            <label for="habitScore">Base score</label>
+            <input id="habitScore" type="number" min="1" max="999" value="10" />
+          </div>
+        </div>
+        <button class="btn btn-habit" style="width:100%" onclick="handleAddHabit()">+ Add Habit</button>
+      </div>
+
+      <div style="height:16px"></div>
+
+      <h3 style="font-size:.78rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:700">
+        🔁 Habit List <span id="habitCount" style="color:var(--h-color)"></span>
+      </h3>
+      <div class="task-list" id="habitList">
+        <div class="empty"><div class="empty-icon">🔁</div>No habits yet.</div>
+      </div>
+    </div>
+
+    <!-- ── One-Time column ───────────────────────── -->
+    <div>
+      <div class="card card-onetime">
+        <div class="card-head">
+          <div class="card-icon icon-onetime">⭐</div>
+          <div>
+            <h2 style="color:var(--o-color)">Add One-Time Task</h2>
+            <p>Completed only once ever — fixed score, no multiplier</p>
+          </div>
+        </div>
+
+        <div class="form-row" style="margin-bottom:10px">
+          <div class="field-group">
+            <label for="otName">Task name</label>
+            <input id="otName" type="text" placeholder="e.g. Set up workspace, Publish article…" maxlength="60" />
+          </div>
+          <div class="field-group narrow">
+            <label for="otScore">Score</label>
+            <input id="otScore" type="number" min="1" max="9999" value="50" />
+          </div>
+        </div>
+        <button class="btn btn-onetime" style="width:100%" onclick="handleAddOneTime()">+ Add One-Time Task</button>
+      </div>
+
+      <div style="height:16px"></div>
+
+      <h3 style="font-size:.78rem;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;font-weight:700">
+        ⭐ One-Time List <span id="onetimeCount" style="color:var(--o-color)"></span>
+      </h3>
+      <div class="task-list" id="onetimeList">
+        <div class="empty"><div class="empty-icon">⭐</div>No one-time tasks yet.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ VIEW: Today ══════════════════════════════════════════════ -->
+<div class="view" id="view-today">
+
+  <!-- Score hero -->
+  <div class="score-hero">
+    <div class="score-hero-left">
+      <div class="score-hero-label">Total score</div>
+      <div class="score-hero-val" id="todayTotal">0</div>
+      <div class="score-hero-date" id="todayDateLabel">—</div>
+    </div>
+    <div class="score-breakdown">
+      <div class="score-part part-habit">
+        <div class="score-part-val" id="todayHabitPts">0</div>
+        <div class="score-part-lbl">🔁 Habits</div>
+      </div>
+      <div style="width:1px;background:var(--border)"></div>
+      <div class="score-part part-onetime">
+        <div class="score-part-val" id="todayOnetimePts">0</div>
+        <div class="score-part-lbl">⭐ One-Time</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="two-col">
+
+    <!-- Completed habits today -->
+    <div>
+      <div class="today-section-label">
+        <span class="section-dot" style="background:var(--h-color)"></span>
+        Habits completed today
+      </div>
+      <div id="todayHabits">
+        <div class="empty"><div class="empty-icon">🔁</div>No habits done yet today.</div>
+      </div>
+    </div>
+
+    <!-- Completed one-time today -->
+    <div>
+      <div class="today-section-label">
+        <span class="section-dot" style="background:var(--o-color)"></span>
+        One-time tasks completed today
+      </div>
+      <div id="todayOnetimes">
+        <div class="empty"><div class="empty-icon">⭐</div>No one-time tasks done today.</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══ VIEW: History ════════════════════════════════════════════ -->
+<div class="view" id="view-history">
+
+  <!-- Streak -->
+  <div class="streak-card">
+    <div class="streak-flame">🔥</div>
+    <div>
+      <div class="streak-num" id="streakVal">0</div>
+      <div class="streak-txt">day streak</div>
+      <div class="streak-hint">Only habit completions count toward streak</div>
+    </div>
+  </div>
+
+  <div id="historyContainer">
+    <div class="empty"><div class="empty-icon">📅</div>No history yet — start completing tasks!</div>
+  </div>
+</div>
+
+<!-- ─── Toast ────────────────────────────────────────────────────── -->
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   HÁBITOS v2 — Habit Tracker
+   Two task types: habit (recurring daily) + one-time (once ever)
+   Persistence: TXT file via FileReader (import) + Blob (export).
+   No localStorage — all data lives in memory between saves.
+   ═══════════════════════════════════════════════════════════════════ */
+
+// ─── Application state (in-memory, no localStorage) ──────────────────
+
+let tasks      = [];
+let executions = [];
+
+// ─── Time helpers ────────────────────────────────────────────────────
+
+/**
+ * Returns the time-of-day period for a given 0–23 hour.
+ * @param {number} hour
+ * @returns {'morning'|'afternoon'|'night'|'early'}
+ */
+function getTimeOfDay(hour) {
+  if (hour >= 5  && hour < 12) return 'morning';
+  if (hour >= 12 && hour < 18) return 'afternoon';
+  if (hour >= 18)              return 'night';
+  return 'early'; // 00:00–04:59, scored same as night
+}
+
+/** Score multipliers per period. */
+const MULTIPLIERS = { morning: 1.0, afternoon: 0.7, night: 0.4, early: 0.4 };
+
+function getMultiplier(period) {
+  return MULTIPLIERS[period] ?? 0.4;
+}
+
+/**
+ * Calculates the final score for a habit completion at a given hour.
+ * @param {number} baseScore
+ * @param {number} hour  0–23
+ * @returns {number}
+ */
+function calculateHabitScore(baseScore, hour) {
+  return Math.round(baseScore * getMultiplier(getTimeOfDay(hour)));
+}
+
+/** Current date as YYYY-MM-DD. */
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/** HH:MM string from a Date. */
+function toHHMM(date = new Date()) {
+  return `${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}`;
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric', year: 'numeric',
+  });
+}
+
+function formatTime12(hhmm) {
+  const [h, m] = hhmm.split(':').map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2,'0')} ${h < 12 ? 'AM' : 'PM'}`;
+}
+
+// ─── Score aggregation ───────────────────────────────────────────────
+
+/**
+ * Sums all execution scores for a given date.
+ * @param {string} dateStr  YYYY-MM-DD
+ * @returns {{ total: number, habits: number, oneTime: number }}
+ */
+function calculateTotalDailyScore(dateStr) {
+  return executions
+    .filter(e => e.date === dateStr)
+    .reduce((acc, e) => {
+      acc.total += e.score;
+      if (e.taskType === 'habit')    acc.habits  += e.score;
+      if (e.taskType === 'one-time') acc.oneTime += e.score;
+      return acc;
+    }, { total: 0, habits: 0, oneTime: 0 });
+}
+
+// ─── Completion guards ───────────────────────────────────────────────
+
+function isHabitCompletedToday(taskId) {
+  const today = todayStr();
+  return executions.some(e => e.taskId === taskId && e.date === today);
+}
+
+function isOneTimeCompleted(taskId) {
+  return executions.some(e => e.taskId === taskId);
+}
+
+// ─── TXT format: parser ──────────────────────────────────────────────
+//
+// Format (strict):
+//   [TASKS]
+//   id:<uuid>|name:<encoded>|type:<encoded>|baseScore:<n>|createdAt:<encoded>
+//
+//   [EXECUTIONS]
+//   id:<uuid>|taskId:<uuid>|taskType:<encoded>|date:<YYYY-MM-DD>|time:<HH:MM>|period:<encoded>|score:<n>
+//
+// String values are encodeURIComponent-encoded so pipes and colons in names
+// can never break the parser. Numbers and UUIDs (alphanumeric + dash) are safe raw.
+
+/**
+ * Splits one pipe-delimited record line into a key→value object.
+ * Each field is split on the FIRST colon only, so HH:MM values work correctly.
+ * @param {string} line
+ * @returns {Record<string,string>|null}
+ */
+function parseFields(line) {
+  try {
+    const obj = {};
+    for (const part of line.split('|')) {
+      const sep = part.indexOf(':');
+      if (sep === -1) continue;
+      obj[part.slice(0, sep).trim()] = part.slice(sep + 1).trim();
+    }
+    return obj;
+  } catch {
+    return null;
+  }
+}
+
+/** Safe decodeURIComponent wrapper — returns raw string on failure. */
+function dec(s) {
+  if (!s) return s;
+  try { return decodeURIComponent(s); } catch { return s; }
+}
+
+/**
+ * Parses a full .txt snapshot into { tasks, executions }.
+ * Skips malformed lines silently — never throws.
+ * @param {string} text  Raw file contents
+ * @returns {{ tasks: object[], executions: object[] }}
+ */
+function parseTXTData(text) {
+  const result = { tasks: [], executions: [] };
+  if (!text || !text.trim()) return result;
+
+  let section = null;
+
+  for (const raw of text.split('\n')) {
+    const line = raw.trim();
+    if (!line) continue;
+
+    // Section headers
+    if (line === '[TASKS]')      { section = 'tasks';      continue; }
+    if (line === '[EXECUTIONS]') { section = 'executions'; continue; }
+    if (line.startsWith('['))    { section = null;          continue; }
+    if (!section) continue;
+
+    const f = parseFields(line);
+    if (!f) continue;
+
+    if (section === 'tasks') {
+      const task = {
+        id:        f.id        || '',
+        type:      dec(f.type) || 'habit',
+        name:      dec(f.name) || '(unnamed)',
+        baseScore: parseInt(f.baseScore, 10) || 10,
+        createdAt: dec(f.createdAt) || new Date().toISOString(),
+      };
+      // Require at minimum a non-empty id and name
+      if (task.id && task.name !== '(unnamed)') result.tasks.push(task);
+      else if (task.id) result.tasks.push(task); // keep even unnamed
+    }
+
+    if (section === 'executions') {
+      const exec = {
+        id:       f.id       || crypto.randomUUID(),
+        taskId:   f.taskId   || '',
+        taskType: dec(f.taskType) || 'habit',
+        date:     f.date     || '',
+        time:     f.time     || '00:00',
+        period:   (f.period === 'none' || !f.period) ? null : dec(f.period),
+        score:    parseInt(f.score, 10) || 0,
+      };
+      if (exec.taskId && exec.date) result.executions.push(exec);
+    }
+  }
+
+  return result;
+}
+
+// ─── TXT format: generator ───────────────────────────────────────────
+
+/**
+ * Serialises current tasks and executions to a .txt snapshot string.
+ * @param {object[]} tasks
+ * @param {object[]} executions
+ * @returns {string}
+ */
+function generateTXTData(tasks, executions) {
+  const e = encodeURIComponent;
+
+  const taskLines = tasks.map(t =>
+    `id:${t.id}|name:${e(t.name)}|type:${e(t.type)}|baseScore:${t.baseScore}|createdAt:${e(t.createdAt)}`
+  );
+
+  const execLines = executions.map(x =>
+    `id:${x.id}|taskId:${x.taskId}|taskType:${e(x.taskType)}|date:${x.date}|time:${x.time}|period:${x.period ? e(x.period) : 'none'}|score:${x.score}`
+  );
+
+  return [
+    '[TASKS]',
+    ...taskLines,
+    '',
+    '[EXECUTIONS]',
+    ...execLines,
+    '', // trailing newline
+  ].join('\n');
+}
+
+// ─── File I/O: import ────────────────────────────────────────────────
+
+/** Opens the OS file picker. The actual work happens in the change listener below. */
+function handleImport() {
+  document.getElementById('fileInput').click();
+}
+
+document.getElementById('fileInput').addEventListener('change', function () {
+  const file = this.files[0];
+  this.value = ''; // reset so the same file can be re-imported
+
+  if (!file) return;
+
+  if (!file.name.toLowerCase().endsWith('.txt')) {
+    showToast('⚠️ Please select a .txt file');
+    return;
+  }
+
+  const reader = new FileReader();
+
+  reader.onload = function (evt) {
+    const text = evt.target.result;
+
+    if (!text || !text.trim()) {
+      showToast('⚠️ The file is empty — nothing to load');
+      return;
+    }
+
+    try {
+      const data = parseTXTData(text);
+
+      if (data.tasks.length === 0 && data.executions.length === 0) {
+        showToast('⚠️ File parsed but contained no valid records');
+        return;
+      }
+
+      tasks      = data.tasks;
+      executions = data.executions;
+      markUnsaved(false); // freshly imported = in sync with file
+      renderAll();
+      showToast(
+        `✅ Data loaded — ${tasks.length} task${tasks.length !== 1 ? 's' : ''}, ` +
+        `${executions.length} execution${executions.length !== 1 ? 's' : ''}`,
+        3500
+      );
+    } catch {
+      showToast('⚠️ Could not parse file — is the format correct?');
+    }
+  };
+
+  reader.onerror = function () {
+    showToast('⚠️ Failed to read the file');
+  };
+
+  reader.readAsText(file, 'UTF-8');
+});
+
+// ─── File I/O: export ────────────────────────────────────────────────
+
+/** Generates a .txt snapshot and triggers a browser download. */
+function handleSave() {
+  const text     = generateTXTData(tasks, executions);
+  const blob     = new Blob([text], { type: 'text/plain;charset=utf-8' });
+  const url      = URL.createObjectURL(blob);
+  const anchor   = document.createElement('a');
+  anchor.href     = url;
+  anchor.download = `habitos-${todayStr()}.txt`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+  markUnsaved(false);
+  showToast('💾 File downloaded — your data is saved');
+}
+
+// ─── Unsaved-changes indicator ───────────────────────────────────────
+
+/**
+ * Shows or hides the unsaved-changes banner.
+ * Call markUnsaved(true) after any in-memory mutation.
+ * Call markUnsaved(false) after import or export.
+ */
+function markUnsaved(isDirty = true) {
+  document.getElementById('unsavedBanner').classList.toggle('visible', isDirty);
+}
+
+// ─── CRUD: Tasks ─────────────────────────────────────────────────────
+
+function addHabitTask(name, baseScore) {
+  const task = {
+    id:        crypto.randomUUID(),
+    type:      'habit',
+    name:      name.trim(),
+    baseScore: clamp(parseInt(baseScore, 10) || 10, 1, 999),
+    createdAt: new Date().toISOString(),
+  };
+  tasks = [...tasks, task];
+  markUnsaved();
+  return task;
+}
+
+function addOneTimeTask(name, score) {
+  const task = {
+    id:        crypto.randomUUID(),
+    type:      'one-time',
+    name:      name.trim(),
+    baseScore: clamp(parseInt(score, 10) || 50, 1, 9999),
+    createdAt: new Date().toISOString(),
+  };
+  tasks = [...tasks, task];
+  markUnsaved();
+  return task;
+}
+
+function deleteTask(taskId) {
+  tasks      = tasks.filter(t => t.id !== taskId);
+  executions = executions.filter(e => e.taskId !== taskId);
+  markUnsaved();
+}
+
+// ─── Completions ─────────────────────────────────────────────────────
+
+/**
+ * Records a habit completion right now. Returns the execution or null if duplicate.
+ */
+function completeHabit(taskId) {
+  if (isHabitCompletedToday(taskId)) return null;
+
+  const task = tasks.find(t => t.id === taskId);
+  if (!task || task.type !== 'habit') return null;
+
+  const now    = new Date();
+  const hour   = now.getHours();
+  const period = getTimeOfDay(hour);
+  const score  = calculateHabitScore(task.baseScore, hour);
+
+  const exec = {
+    id:       crypto.randomUUID(),
+    taskId,
+    taskType: 'habit',
+    date:     todayStr(),
+    time:     toHHMM(now),
+    period,
+    score,
+  };
+
+  executions = [...executions, exec];
+  markUnsaved();
+  return exec;
+}
+
+/**
+ * Records a one-time task completion. Returns the execution or null if already done.
+ */
+function completeOneTime(taskId) {
+  if (isOneTimeCompleted(taskId)) return null;
+
+  const task = tasks.find(t => t.id === taskId);
+  if (!task || task.type !== 'one-time') return null;
+
+  const exec = {
+    id:       crypto.randomUUID(),
+    taskId,
+    taskType: 'one-time',
+    date:     todayStr(),
+    time:     toHHMM(new Date()),
+    period:   null,
+    score:    task.baseScore,
+  };
+
+  executions = [...executions, exec];
+  markUnsaved();
+  return exec;
+}
+
+// ─── Streak (habits only) ────────────────────────────────────────────
+
+function calculateStreak() {
+  const habitExecs = executions.filter(e => e.taskType === 'habit');
+  const days = [...new Set(habitExecs.map(e => e.date))].sort().reverse();
+  if (days.length === 0) return 0;
+
+  let streak  = 0;
+  let cursor  = new Date();
+  cursor.setHours(0, 0, 0, 0);
+
+  for (const d of days) {
+    const day  = new Date(d + 'T00:00:00');
+    const diff = Math.round((cursor - day) / 86_400_000);
+    if (diff === 0 || diff === 1) { streak++; cursor = day; }
+    else break;
+  }
+
+  return streak;
+}
+
+// ─── History data ────────────────────────────────────────────────────
+
+function buildHistory() {
+  const byDate = {};
+
+  for (const exec of executions) {
+    if (!byDate[exec.date]) byDate[exec.date] = [];
+    byDate[exec.date].push(exec);
+  }
+
+  return Object.entries(byDate)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, execs]) => ({
+      date,
+      total:   execs.reduce((s, e) => s + e.score, 0),
+      habits:  execs.filter(e => e.taskType === 'habit'),
+      onetime: execs.filter(e => e.taskType === 'one-time'),
+    }));
+}
+
+// ─── Render helpers ──────────────────────────────────────────────────
+
+const TOD = {
+  morning:   { label: '☀️ Morning',   cls: 'tod-morning',   mul: '×1.0' },
+  afternoon: { label: '🌤 Afternoon', cls: 'tod-afternoon', mul: '×0.7' },
+  night:     { label: '🌙 Night',     cls: 'tod-night',     mul: '×0.4' },
+  early:     { label: '🌑 Early',     cls: 'tod-early',     mul: '×0.4' },
+};
+
+function todBadge(period) {
+  const t = TOD[period] || TOD.night;
+  return `<span class="tod-badge ${t.cls}">${t.label} ${t.mul}</span>`;
+}
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function clamp(v, min, max) { return Math.max(min, Math.min(max, v)); }
+
+// ─── Render: header ──────────────────────────────────────────────────
+
+function renderHeader() {
+  const now    = new Date();
+  const hour   = now.getHours();
+  const period = getTimeOfDay(hour);
+  const tod    = TOD[period];
+  const hhmm   = toHHMM(now);
+
+  document.getElementById('headerTime').textContent =
+    `${formatTime12(hhmm)} · ${tod.label}`;
+
+  document.getElementById('nowPeriodLabel').textContent  = tod.label;
+  document.getElementById('nowMultiplier').textContent   = tod.mul;
+
+  const today  = calculateTotalDailyScore(todayStr());
+  const streak = calculateStreak();
+  const habits  = tasks.filter(t => t.type === 'habit').length;
+  const onetimes = tasks.filter(t => t.type === 'one-time').length;
+
+  document.getElementById('hdrTodayPts').textContent = today.total;
+  document.getElementById('hdrStreak').textContent   = streak;
+  document.getElementById('hdrHabits').textContent   = habits;
+  document.getElementById('hdrOnetime').textContent  = onetimes;
+  document.getElementById('tabBadgeTasks').textContent = habits + onetimes;
+  document.getElementById('streakVal').textContent   = streak;
+}
+
+// ─── Render: task lists ──────────────────────────────────────────────
+
+function renderHabitList() {
+  const habits = tasks.filter(t => t.type === 'habit');
+  const el     = document.getElementById('habitList');
+  const now    = new Date();
+  const hour   = now.getHours();
+
+  document.getElementById('habitCount').textContent =
+    habits.length ? `(${habits.length})` : '';
+
+  if (habits.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">🔁</div>No habits yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = habits.map(task => {
+    const done    = isHabitCompletedToday(task.id);
+    const preview = calculateHabitScore(task.baseScore, hour);
+
+    return `
+      <div class="task-item habit-item${done ? '' : ''}">
+        <div class="task-item-body">
+          <div class="task-item-name">${esc(task.name)}</div>
+          <div class="task-item-meta">
+            <span class="type-chip chip-habit">Habit</span>
+            <span class="task-item-score">Base ${task.baseScore} · Now ${preview} pts</span>
+          </div>
+        </div>
+        <div class="task-actions">
+          ${done
+            ? `<button class="btn btn-done" disabled>✓ Done today</button>`
+            : `<button class="btn btn-complete-habit" onclick="handleCompleteHabit('${task.id}')">Complete</button>`}
+          <button class="btn btn-ghost" style="padding:7px 10px" onclick="handleDelete('${task.id}')" title="Delete">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderOneTimeList() {
+  const onetime = tasks.filter(t => t.type === 'one-time');
+  const el      = document.getElementById('onetimeList');
+
+  document.getElementById('onetimeCount').textContent =
+    onetime.length ? `(${onetime.length})` : '';
+
+  if (onetime.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⭐</div>No one-time tasks yet.</div>`;
+    return;
+  }
+
+  el.innerHTML = onetime.map(task => {
+    const done = isOneTimeCompleted(task.id);
+
+    return `
+      <div class="task-item onetime-item${done ? ' completed-permanently' : ''}">
+        <div class="task-item-body">
+          <div class="task-item-name">${esc(task.name)}</div>
+          <div class="task-item-meta">
+            <span class="type-chip chip-onetime">One-Time</span>
+            ${done
+              ? `<span class="type-chip chip-done">Completed</span>`
+              : `<span class="task-item-score">${task.baseScore} pts (fixed)</span>`}
+          </div>
+        </div>
+        <div class="task-actions">
+          ${done
+            ? `<button class="btn btn-done" disabled>✓ Done</button>`
+            : `<button class="btn btn-complete-onetime" onclick="handleCompleteOneTime('${task.id}')">Complete</button>`}
+          <button class="btn btn-ghost" style="padding:7px 10px" onclick="handleDelete('${task.id}')" title="Delete">✕</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Render: today ───────────────────────────────────────────────────
+
+function renderToday() {
+  const today   = todayStr();
+  const scores  = calculateTotalDailyScore(today);
+  const taskMap = Object.fromEntries(tasks.map(t => [t.id, t]));
+  const todayEx = executions.filter(e => e.date === today);
+
+  document.getElementById('todayTotal').textContent     = scores.total;
+  document.getElementById('todayHabitPts').textContent  = scores.habits;
+  document.getElementById('todayOnetimePts').textContent = scores.oneTime;
+  document.getElementById('todayDateLabel').textContent = formatDate(today);
+
+  // Habits done today
+  const habitDone = todayEx
+    .filter(e => e.taskType === 'habit')
+    .sort((a, b) => b.time.localeCompare(a.time));
+
+  const todayHabitsEl = document.getElementById('todayHabits');
+  todayHabitsEl.innerHTML = habitDone.length === 0
+    ? `<div class="empty"><div class="empty-icon">🔁</div>No habits done yet today.</div>`
+    : habitDone.map(exec => {
+        const task = taskMap[exec.taskId];
+        return `
+          <div class="compl-item">
+            <div>
+              <div class="compl-name">${esc(task?.name ?? '(deleted)')}</div>
+              <div class="compl-sub">
+                ${formatTime12(exec.time)}
+                ${todBadge(exec.period)}
+              </div>
+            </div>
+            <span class="pts-chip pts-habit">+${exec.score} pts</span>
+          </div>`;
+      }).join('');
+
+  // One-times done today
+  const onetimeDone = todayEx
+    .filter(e => e.taskType === 'one-time')
+    .sort((a, b) => b.time.localeCompare(a.time));
+
+  const todayOnetimesEl = document.getElementById('todayOnetimes');
+  todayOnetimesEl.innerHTML = onetimeDone.length === 0
+    ? `<div class="empty"><div class="empty-icon">⭐</div>No one-time tasks done today.</div>`
+    : onetimeDone.map(exec => {
+        const task = taskMap[exec.taskId];
+        return `
+          <div class="compl-item">
+            <div>
+              <div class="compl-name">${esc(task?.name ?? '(deleted)')}</div>
+              <div class="compl-sub">
+                ${formatTime12(exec.time)}
+                <span class="type-chip chip-onetime" style="font-size:.65rem">Fixed score</span>
+              </div>
+            </div>
+            <span class="pts-chip pts-onetime">+${exec.score} pts</span>
+          </div>`;
+      }).join('');
+}
+
+// ─── Render: history ─────────────────────────────────────────────────
+
+function renderHistory() {
+  const history = buildHistory();
+  const el      = document.getElementById('historyContainer');
+  const taskMap = Object.fromEntries(tasks.map(t => [t.id, t]));
+
+  if (history.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📅</div>No history yet — start completing tasks!</div>`;
+    return;
+  }
+
+  // Flag the highest-score day
+  const maxScore = Math.max(...history.map(d => d.total));
+
+  el.innerHTML = history.map((day, i) => {
+    const isToday = day.date === todayStr();
+    const isTop   = day.total === maxScore && maxScore > 0;
+
+    const entries = [...day.habits, ...day.onetime]
+      .sort((a, b) => b.time.localeCompare(a.time))
+      .map(exec => {
+        const task = taskMap[exec.taskId];
+        const name = esc(task?.name ?? '(deleted)');
+        const chip = exec.taskType === 'habit'
+          ? `<span class="type-chip chip-habit">Habit</span>`
+          : `<span class="type-chip chip-onetime">One-Time</span>`;
+        const sub = exec.taskType === 'habit'
+          ? todBadge(exec.period)
+          : `<span class="tod-badge tod-early">Fixed</span>`;
+
+        return `
+          <div class="hist-entry">
+            <div class="hist-entry-left">
+              ${chip}
+              <span>${name}</span>
+              ${sub}
+            </div>
+            <span style="font-weight:800;color:${exec.taskType==='habit'?'var(--h-color)':'var(--o-color)'}">+${exec.score}</span>
+          </div>`;
+      }).join('');
+
+    return `
+      <div class="hist-day${isTop ? ' high-score' : ''}">
+        <div class="hist-day-head" onclick="toggleHist(this)">
+          <div>
+            <div class="hist-day-date">
+              ${isToday ? '📍 Today — ' : ''}${formatDate(day.date)}
+              ${isTop ? ' 🏆' : ''}
+            </div>
+            <div class="hist-day-meta">
+              ${day.habits.length} habit${day.habits.length!==1?'s':''} &nbsp;·&nbsp;
+              ${day.onetime.length} one-time &nbsp;·&nbsp;
+              ${day.total} pts total
+            </div>
+          </div>
+          <div class="hist-day-right">
+            <span class="hist-day-total">${day.total} pts</span>
+            <span class="hist-chevron${i===0?' open':''}">▼</span>
+          </div>
+        </div>
+        <div class="hist-entries${i===0?' open':''}">${entries}</div>
+      </div>`;
+  }).join('');
+}
+
+// ─── Render orchestration ────────────────────────────────────────────
+
+function renderAll() {
+  renderHeader();
+  renderHabitList();
+  renderOneTimeList();
+  renderToday();
+  renderHistory();
+}
+
+// ─── Event handlers ──────────────────────────────────────────────────
+
+function handleAddHabit() {
+  const nameEl  = document.getElementById('habitName');
+  const scoreEl = document.getElementById('habitScore');
+  const name    = nameEl.value.trim();
+
+  if (!name) { nameEl.focus(); showToast('⚠️ Please enter a habit name'); return; }
+
+  addHabitTask(name, scoreEl.value);
+  nameEl.value  = '';
+  scoreEl.value = '10';
+  nameEl.focus();
+
+  renderAll();
+  showToast(`✅ Habit "${name}" added!`);
+}
+
+function handleAddOneTime() {
+  const nameEl  = document.getElementById('otName');
+  const scoreEl = document.getElementById('otScore');
+  const name    = nameEl.value.trim();
+
+  if (!name) { nameEl.focus(); showToast('⚠️ Please enter a task name'); return; }
+
+  addOneTimeTask(name, scoreEl.value);
+  nameEl.value  = '';
+  scoreEl.value = '50';
+  nameEl.focus();
+
+  renderAll();
+  showToast(`⭐ One-time task "${name}" added!`);
+}
+
+function handleDelete(taskId) {
+  const task = tasks.find(t => t.id === taskId);
+  if (!task) return;
+  deleteTask(taskId);
+  renderAll();
+  showToast(`🗑️ "${task.name}" deleted`);
+}
+
+function handleCompleteHabit(taskId) {
+  const exec = completeHabit(taskId);
+
+  if (!exec) { showToast('⚠️ Already completed today!'); return; }
+
+  const task = tasks.find(t => t.id === taskId);
+  const tod  = TOD[exec.period];
+  renderAll();
+  showToast(`🎉 +${exec.score} pts! ${tod.label} ${tod.mul} applied`);
+}
+
+function handleCompleteOneTime(taskId) {
+  const exec = completeOneTime(taskId);
+
+  if (!exec) { showToast('⚠️ Already completed!'); return; }
+
+  const task = tasks.find(t => t.id === taskId);
+  renderAll();
+  showToast(`⭐ +${exec.score} pts! One-time task done!`);
+}
+
+// ─── Tab switching ───────────────────────────────────────────────────
+
+function switchTab(tab, btn) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`view-${tab}`).classList.add('active');
+  btn.classList.add('active');
+
+  // Refresh content when switching to keep data fresh
+  if (tab === 'today')   renderToday();
+  if (tab === 'history') { renderHistory(); renderHeader(); }
+}
+
+// ─── History accordion ───────────────────────────────────────────────
+
+function toggleHist(header) {
+  const entries = header.nextElementSibling;
+  const chevron = header.querySelector('.hist-chevron');
+  entries.classList.toggle('open');
+  chevron.classList.toggle('open');
+}
+
+// ─── Toast ───────────────────────────────────────────────────────────
+
+let _toastTimer;
+
+function showToast(msg, duration = 2800) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// ─── Keyboard shortcuts ──────────────────────────────────────────────
+
+document.addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  const id = document.activeElement?.id;
+  if (id === 'habitName' || id === 'habitScore') handleAddHabit();
+  if (id === 'otName'    || id === 'otScore')    handleAddOneTime();
+});
+
+// ─── Live clock refresh ──────────────────────────────────────────────
+
+// Update multiplier display every minute (time period can shift)
+setInterval(() => { renderHeader(); renderHabitList(); }, 60_000);
+
+// ─── Init ────────────────────────────────────────────────────────────
+
+renderAll();
+</script>
+</body>
+</html>
