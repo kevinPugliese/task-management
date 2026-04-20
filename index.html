@@ -1102,7 +1102,17 @@
       text-transform: uppercase;
       letter-spacing: .5px;
       color: var(--text2);
+      cursor: pointer;
+      user-select: none;
     }
+    .group-header:hover { color: var(--text); }
+    .group-chevron {
+      font-size: .65rem; color: var(--text3);
+      transition: transform var(--t); flex-shrink: 0;
+    }
+    .group-chevron.open { transform: rotate(90deg); }
+    .group-items { }
+    .group-items.collapsed { display: none; }
 
     .group-header:first-child { margin-top: 0; }
 
@@ -1768,8 +1778,11 @@
       margin: 22px 0 10px;
       font-size: .72rem; font-weight: 700;
       text-transform: uppercase; letter-spacing: .5px; color: var(--text2);
+      cursor: pointer; user-select: none;
     }
+    .goal-group-header:hover { color: var(--text); }
     .goal-group-header:first-child { margin-top: 0; }
+    .goal-group-items.collapsed { display: none; }
     .goal-group-line { flex: 1; height: 1px; background: var(--border); }
     .goal-group-count {
       font-size: .65rem; font-weight: 700; padding: 1px 7px;
@@ -2986,6 +2999,7 @@ let taskSearch     = '';
 let planViewDate   = '';   // set on init
 let _planPickerHour   = null;
 let _taskDetailId     = null;
+const _collapsedGroups = new Set(); // keys: "habit:groupName", "one-time:groupName", "goal:catName"
 
 const focusState = {
   taskId: null, taskName: null, taskType: null,
@@ -3140,7 +3154,7 @@ function dec(s) {
  * @returns {{ tasks: object[], executions: object[] }}
  */
 function parseTXTData(text) {
-  const result = { tasks: [], executions: [], skips: [], goals: [] };
+  const result = { tasks: [], executions: [], skips: [], goals: [], extended: null };
   if (!text || !text.trim()) return result;
 
   let section = null;
@@ -3150,11 +3164,17 @@ function parseTXTData(text) {
     if (!line) continue;
 
     // Section headers
-    if (line === '[TASKS]')      { section = 'tasks';      continue; }
-    if (line === '[EXECUTIONS]') { section = 'executions'; continue; }
-    if (line === '[SKIPS]')      { section = 'skips';      continue; }
-    if (line === '[GOALS]')      { section = 'goals';      continue; }
-    if (line.startsWith('['))    { section = null;          continue; }
+    if (line === '[TASKS]')         { section = 'tasks';         continue; }
+    if (line === '[EXECUTIONS]')    { section = 'executions';    continue; }
+    if (line === '[SKIPS]')         { section = 'skips';         continue; }
+    if (line === '[GOALS]')         { section = 'goals';         continue; }
+    if (line === '[JSON_EXTENDED]') { section = 'extended';      continue; }
+    if (line.startsWith('['))       { section = null;             continue; }
+
+    if (section === 'extended') {
+      try { result.extended = JSON.parse(line); } catch {}
+      continue;
+    }
     if (!section) continue;
 
     const f = parseFields(line);
@@ -3169,6 +3189,7 @@ function parseTXTData(text) {
         createdAt: dec(f.createdAt) || new Date().toISOString(),
         group:    f.group ? dec(f.group).toLowerCase() : '',
         archived: f.archived === '1',
+        backlog:  f.backlog  === '1',
         notes:    f.notes ? dec(f.notes) : '',
         subtasks: f.subtasks ? JSON.parse(dec(f.subtasks)) : [],
         priority:       f.priority       ? dec(f.priority)                 : 'normal',
@@ -3233,7 +3254,7 @@ function generateTXTData(tasks, executions) {
   const e = encodeURIComponent;
 
   const taskLines = tasks.map(t =>
-    `id:${t.id}|name:${e(t.name)}|type:${e(t.type)}|baseScore:${t.baseScore}|createdAt:${e(t.createdAt)}|group:${e(t.group||'')}|archived:${t.archived?'1':'0'}|notes:${e(t.notes||'')}|subtasks:${e(JSON.stringify(t.subtasks||[]))}|priority:${e(t.priority||'normal')}|timeEstimate:${e(t.timeEstimate||'')}|frequency:${e(t.frequency||'daily')}|frequencyCount:${t.frequencyCount||1}`
+    `id:${t.id}|name:${e(t.name)}|type:${e(t.type)}|baseScore:${t.baseScore}|createdAt:${e(t.createdAt)}|group:${e(t.group||'')}|archived:${t.archived?'1':'0'}|backlog:${t.backlog?'1':'0'}|notes:${e(t.notes||'')}|subtasks:${e(JSON.stringify(t.subtasks||[]))}|priority:${e(t.priority||'normal')}|timeEstimate:${e(t.timeEstimate||'')}|frequency:${e(t.frequency||'daily')}|frequencyCount:${t.frequencyCount||1}`
   );
 
   const execLines = executions.map(x =>
@@ -3245,6 +3266,9 @@ function generateTXTData(tasks, executions) {
   const goalLines = goals.map(g =>
     `id:${g.id}|name:${e(g.name)}|targetPoints:${g.targetPoints}|habitIds:${e(JSON.stringify(g.habitIds))}|createdAt:${e(g.createdAt)}|completedAt:${g.completedAt ? e(g.completedAt) : 'null'}|category:${e(g.category||'')}|deadline:${g.deadline||'null'}`
   );
+
+  // Complex structures serialised as a single JSON block
+  const extended = JSON.stringify({ dayPlans, focusSessions, knowledge, knowCategories });
 
   return [
     '[TASKS]',
@@ -3258,6 +3282,9 @@ function generateTXTData(tasks, executions) {
     '',
     '[GOALS]',
     ...goalLines,
+    '',
+    '[JSON_EXTENDED]',
+    extended,
     '',
   ].join('\n');
 }
@@ -3293,7 +3320,7 @@ document.getElementById('fileInput').addEventListener('change', function () {
     try {
       const data = parseTXTData(text);
 
-      if (data.tasks.length === 0 && data.executions.length === 0) {
+      if (data.tasks.length === 0 && data.executions.length === 0 && !data.extended) {
         showToast('⚠️ File parsed but contained no valid records');
         return;
       }
@@ -3302,12 +3329,23 @@ document.getElementById('fileInput').addEventListener('change', function () {
       executions = data.executions;
       skips      = data.skips  || [];
       goals      = data.goals  || [];
+
+      // Restore complex structures from [JSON_EXTENDED] block
+      const ext = data.extended;
+      if (ext) {
+        if (ext.dayPlans       && typeof ext.dayPlans === 'object')        dayPlans       = ext.dayPlans;
+        if (Array.isArray(ext.focusSessions))                              focusSessions  = ext.focusSessions;
+        if (Array.isArray(ext.knowledge))                                  knowledge      = ext.knowledge;
+        if (Array.isArray(ext.knowCategories))                             knowCategories = ext.knowCategories;
+      }
+
       saveToLocalStorage();
-      markUnsaved(false); // freshly imported = in sync with file
+      markUnsaved(false);
       renderAll();
       showToast(
-        `✅ Data loaded — ${tasks.length} task${tasks.length !== 1 ? 's' : ''}, ` +
-        `${executions.length} execution${executions.length !== 1 ? 's' : ''}`,
+        `✅ Dados carregados — ${tasks.length} task${tasks.length !== 1 ? 's' : ''}, ` +
+        `${executions.length} execução${executions.length !== 1 ? 'ões' : ''}` +
+        `${ext?.knowledge?.length ? `, ${ext.knowledge.length} docs` : ''}`,
         3500
       );
     } catch {
@@ -3918,15 +3956,18 @@ function renderGroupedList(type, elId, emptyIcon, emptyMsg) {
 
   const groups = groupedTasks(list);
   el.innerHTML = groups.map(([groupName, members], gi) => {
-    const label = groupName || '<span style="color:var(--text3);font-style:italic">sem grupo</span>';
+    const key        = `${type}:${groupName}`;
+    const collapsed  = _collapsedGroups.has(key);
+    const label      = groupName || '<span style="color:var(--text3);font-style:italic">sem grupo</span>';
     const header = `
-      <div class="group-header">
-        <div class="sort-btns" style="flex-direction:row;gap:3px">
+      <div class="group-header" onclick="toggleGroupCollapse('${esc(type)}','${esc(groupName)}')">
+        <span class="group-chevron${collapsed ? '' : ' open'}">▶</span>
+        <div class="sort-btns" style="flex-direction:row;gap:3px" onclick="event.stopPropagation()">
           <button class="btn-sort" onclick="handleMoveGroup('${type}',${gi},-1)" ${gi===0?'disabled':''}>▲</button>
           <button class="btn-sort" onclick="handleMoveGroup('${type}',${gi},1)"  ${gi===groups.length-1?'disabled':''}>▼</button>
         </div>
         ${groupName
-          ? `<span class="group-name-label" title="Clique para renomear" onclick="editGroupName(this,'${esc(type)}','${esc(groupName)}')">${esc(groupName)}</span>`
+          ? `<span class="group-name-label" title="Clique para renomear" onclick="event.stopPropagation();editGroupName(this,'${esc(type)}','${esc(groupName)}')">${esc(groupName)}</span>`
           : `<span>${label}</span>`}
         <span class="group-count">${members.length}</span>
         <span class="group-header-line"></span>
@@ -3937,7 +3978,7 @@ function renderGroupedList(type, elId, emptyIcon, emptyMsg) {
           (PRIORITY_ORDER[a.priority||'normal'] ?? 1) - (PRIORITY_ORDER[b.priority||'normal'] ?? 1))
       : members;
     const items = sorted.map((t, i) => renderTaskItem(t, i, sorted.length, type)).join('');
-    return header + items;
+    return header + `<div class="group-items${collapsed ? ' collapsed' : ''}">${items}</div>`;
   }).join('');
 
   updateGroupDatalist(type);
@@ -4453,9 +4494,12 @@ function renderGoals() {
   }
 
   container.innerHTML = groupOrder.map(cat => {
-    const members = groupMap.get(cat);
+    const members   = groupMap.get(cat);
+    const key       = `goal:${cat}`;
+    const collapsed = _collapsedGroups.has(key);
     const header  = `
-      <div class="goal-group-header">
+      <div class="goal-group-header" onclick="toggleGroupCollapse('goal','${esc(cat)}')">
+        <span class="group-chevron${collapsed ? '' : ' open'}">▶</span>
         <span>${cat ? esc(cat) : '<span style="color:var(--text3);font-style:italic">sem tipo</span>'}</span>
         <span class="goal-group-count">${members.length}</span>
         <span class="goal-group-line"></span>
@@ -4528,7 +4572,7 @@ function renderGoals() {
         </div>
       </div>`;
     }).join('');
-    return header + cards;
+    return header + `<div class="goal-group-items${collapsed ? ' collapsed' : ''}">${cards}</div>`;
   }).join('');
 }
 
@@ -4590,6 +4634,14 @@ function handleAddGoal() {
   deadlineEl.value  = '';
   renderGoals();
   showToast(`🎯 Objetivo "${name}" criado!`);
+}
+
+function toggleGroupCollapse(type, groupName) {
+  const key = `${type}:${groupName}`;
+  if (_collapsedGroups.has(key)) _collapsedGroups.delete(key);
+  else _collapsedGroups.add(key);
+  if (type === 'goal') renderGoals();
+  else { renderHabitList(); renderOneTimeList(); }
 }
 
 function moveGoal(goalId, dir) {
